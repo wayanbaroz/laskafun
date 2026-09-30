@@ -255,8 +255,8 @@ def login():
         password = request.form['password']
 
         # Ambil kredensial dari Environment Variables
-        admin_user = os.environ.get('ADMIN_USER', 'admin')
-        admin_pass = os.environ.get('ADMIN_PASS', 'admin123')
+        admin_user = os.environ.get('ADMIN_USER')
+        admin_pass = os.environ.get('ADMIN_PASS')
 
         if username == admin_user and password == admin_pass:
             session['logged_in'] = True
