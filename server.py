@@ -248,21 +248,19 @@ def kontak():
     return render_template('kontak.html')
 
 
+
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
 
-        # Ambil dari Environment Variables Railway
-        admin_user = os.environ.get('ADMIN_USER', 'admin')
-        admin_pass = os.environ.get('ADMIN_PASS', 'admim123c')
+        # Mengambil kredensial secara aman dari Environment Variables Railway
+        admin_user = os.environ.get('ADMIN_USER')
+        admin_pass = os.environ.get('ADMIN_PASS')
 
-        # Print ke log Railway untuk debugging (tanpa membocorkan isi password di repositori)
-        print(f"[DEBUG LOGIN] Attempt username: {username}")
-        print(f"[DEBUG LOGIN] Expected user: {admin_user}")
-
-        if username == admin_user and password == admin_pass:
+        if admin_user and admin_pass and username == admin_user and password == admin_pass:
             session['logged_in'] = True
             flash('Berhasil login sebagai Admin!', 'success')
             return redirect(url_for('index'))
@@ -271,6 +269,7 @@ def login():
             return redirect(url_for('login'))
 
     return render_template('login.html')
+
 
 
 @app.route('/logout')
