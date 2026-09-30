@@ -254,8 +254,7 @@ def login():
         username = request.form['username']
         password = request.form['password']
 
-        # Membaca credential dari Environment Variables Railway
-        # Jika di lokal (Termux) belum diset, default-nya pakai 'admin' / 'admin123'
+        # Ambil kredensial dari Environment Variables
         admin_user = os.environ.get('ADMIN_USER', 'admin')
         admin_pass = os.environ.get('ADMIN_PASS', 'admin123')
 
