@@ -254,7 +254,12 @@ def login():
         username = request.form['username']
         password = request.form['password']
 
-        if username == 'admin' and password == 'admin123':
+        # Membaca credential dari Environment Variables Railway
+        # Jika di lokal (Termux) belum diset, default-nya pakai 'admin' / 'admin123'
+        admin_user = os.environ.get('ADMIN_USER', 'admin')
+        admin_pass = os.environ.get('ADMIN_PASS', 'admin123')
+
+        if username == admin_user and password == admin_pass:
             session['logged_in'] = True
             flash('Berhasil login sebagai Admin!', 'success')
             return redirect(url_for('index'))
