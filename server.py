@@ -254,9 +254,13 @@ def login():
         username = request.form['username']
         password = request.form['password']
 
-        # Ambil kredensial dari Environment Variables
-        admin_user = os.environ.get('ADMIN_USER')
-        admin_pass = os.environ.get('ADMIN_PASS')
+        # Ambil dari Environment Variables Railway
+        admin_user = os.environ.get('ADMIN_USER', 'admin')
+        admin_pass = os.environ.get('ADMIN_PASS', 'admim123c')
+
+        # Print ke log Railway untuk debugging (tanpa membocorkan isi password di repositori)
+        print(f"[DEBUG LOGIN] Attempt username: {username}")
+        print(f"[DEBUG LOGIN] Expected user: {admin_user}")
 
         if username == admin_user and password == admin_pass:
             session['logged_in'] = True
