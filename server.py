@@ -61,7 +61,7 @@ with app.app_context():
     db.create_all()
     if not Profile.query.first():
         default_profile = Profile(
-            name='Baros',
+            name='Laska',
             bio=(
                 'Halo! Ini adalah personal journal & web blog tempat saya'
                 ' membagikan cerita, catatan harian, dan artikel menarik.'
