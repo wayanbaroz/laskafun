@@ -227,5 +227,9 @@ def delete_message(msg_id):
   return redirect(url_for('admin_messages'))
 
 
+import os
+
 if __name__ == '__main__':
-  app.run(debug=True)
+    # Membaca port dinamis dari Railway, jika tidak ada (lokal) pakai port 5000
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
