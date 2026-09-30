@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <article class="blog-post">
+            <div class="d-flex justify-content-between align-items-center">
+                <h1 class="blog-post-title mb-0">{{ post.title }}</h1>
+                <span class="badge bg-info text-dark fs-6">{{ post.category }}</span>
+            </div>
+            <p class="blog-post-meta text-muted mt-2">Diposting pada: {{ post.date_posted.strftime('%Y-%m-%d %H:%M') }}</p>
+            <div class="mb-3">
+                <a href="{{ url_for('edit_post', post_id=post.id) }}" class="btn btn-outline-secondary btn-sm">Edit Postingan</a>
+                <form action="{{ url_for('delete_post', post_id=post.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Apakah Anda yakin ingin menghapus postingan ini?');">
+                    <button type="submit" class="btn btn-outline-danger btn-sm">Hapus Postingan</button>
+                </form>
+            </div>
+            <hr>
+            
+            {% macro render_content(text) %}
+                {% for word in text.split() %}
+                    {% if word.startswith('#') %}
+                        <a href="{{ url_for('posts_by_tag', tag=word[1:].strip('#,.!')) }}" class="text-primary text-decoration-none fw-bold">{{ word }}</a>
+                    {% else %}
+                        {{ word }}
+                    {% endif %}
+                {% endfor %}
+            {% endmacro %}
+
+            <div class="content mb-5" style="white-space: pre-line;">
+                {{ render_content(post.content) }}
+            </div>
+        </article>
+
+        <!-- Bagian Komentar -->
+        <section class="comments-section mt-5">
+            <h3>Komentar ({{ post.comments|length }})</h3>
+            <hr>
+            {% if post.comments %}
+                {% for comment in post.comments %}
+                    <div class="card mb-2">
+                        <div class="card-body">
+                            <h6 class="card-title text-primary">{{ comment.author }} <small class="text-muted fs-6">- {{ comment.date_posted.strftime('%Y-%m-%d %H:%M') }}</small></h6>
+                            <p class="card-text mb-0">{{ comment.content }}</p>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p class="text-muted">Belum ada komentar. Jadilah yang pertama berkomentar!</p>
+            {% endif %}
+
+            <!-- Form Tambah Komentar -->
+            <div class="card mt-4 shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">Tinggalkan Komentar</h5>
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label for="author" class="form-label">Nama Anda</label>
+                            <input type="text" class="form-control" id="author" name="author" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="content" class="form-label">Komentar</label>
+                            <textarea class="form-control" id="content" name="content" rows="3" required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-sm">Kirim Komentar</button>
+                    </form>
+                </div>
+            </div>
+        </section>
+
+        <div class="mt-4">
+            <a href="{{ url_for('index') }}" class="btn btn-secondary">&larr; Kembali ke Beranda</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

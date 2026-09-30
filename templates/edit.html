@@ -1,0 +1,35 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <h1 class="mb-4">Edit Jurnal / Blog</h1>
+        <div class="card shadow-sm p-4">
+            <form method="POST" enctype="multipart/form-data">
+                <div class="mb-3">
+                    <label for="title" class="form-label">Judul</label>
+                    <input type="text" class="form-control" id="title" name="title" value="{{ post.title }}" required>
+                </div>
+                <div class="mb-3">
+                    <label for="category" class="form-label">Kategori</label>
+                    <select class="form-select" id="category" name="category" required>
+                        <option value="Jurnal Harian" {% if post.category == 'Jurnal Harian' %}selected{% endif %}>Jurnal Harian</option>
+                        <option value="Artikel Blog" {% if post.category == 'Artikel Blog' %}selected{% endif %}>Artikel Blog</option>
+                        <option value="Galeri Foto" {% if post.category == 'Galeri Foto' %}selected{% endif %}>Galeri Foto</option>
+                        <option value="Catatan Perjalanan" {% if post.category == 'Catatan Perjalanan' %}selected{% endif %}>Catatan Perjalanan</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="image" class="form-label">Ganti Foto / Lampiran (Opsional)</label>
+                    <input type="file" class="form-control" id="image" name="image" accept="image/*">
+                </div>
+                <div class="mb-3">
+                    <label for="content" class="form-label">Konten</label>
+                    <textarea class="form-control" id="content" name="content" rows="6" required>{{ post.content }}</textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Perbarui Postingan</button>
+                <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">Batal</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

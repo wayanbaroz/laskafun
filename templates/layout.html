@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Baros Diary - Catatan Harian & Blog</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0b0b0b;
+            --card-bg: rgba(20, 20, 20, 0.75);
+            --gold: #d4af37;
+            --gold-hover: #f3e5ab;
+            --text-light: #e0e0e0;
+            --border-gold: rgba(212, 175, 55, 0.3);
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-light);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-image: radial-gradient(circle at 50% 10%, #1a1a1a 0%, #050505 90%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Navbar Glass Luxury */
+        .navbar {
+            background: rgba(15, 15, 15, 0.85) !important;
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-gold);
+        }
+
+        .navbar-brand, .nav-link {
+            color: var(--text-light) !important;
+            transition: color 0.3s ease;
+        }
+
+        .navbar-brand:hover, .nav-link:hover {
+            color: var(--gold) !important;
+        }
+
+        /* Card Glassmorphism */
+        .card {
+            background: var(--card-bg) !important;
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--border-gold) !important;
+            color: var(--text-light);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+            border-radius: 12px;
+        }
+
+        /* Ukuran Judul Postingan */
+        .card-title, .card-title a {
+            font-size: 1.25rem !important;
+            font-weight: 600;
+            color: var(--gold) !important;
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        .card-title a:hover {
+            color: var(--gold-hover) !important;
+        }
+
+        /* Tanggal Minimalis Estetik */
+        .card-subtitle {
+            color: #c2a233 !important;
+            font-size: 0.85rem;
+            letter-spacing: 0.5px;
+            font-weight: 500;
+        }
+
+        .blog-post-title {
+            color: var(--gold) !important;
+            font-size: 2rem;
+        }
+
+        /* Tombol Elegan Black & Gold */
+        .btn-primary {
+            background: linear-gradient(135deg, #d4af37 0%, #aa7c11 100%);
+            border: none;
+            color: #000;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #f3e5ab 0%, #d4af37 100%);
+            color: #000;
+            box-shadow: 0 0 15px rgba(212, 175, 55, 0.5);
+        }
+
+        .btn-outline-primary {
+            color: var(--gold);
+            border-color: var(--gold);
+        }
+
+        .btn-outline-primary:hover {
+            background-color: var(--gold);
+            color: #000;
+            border-color: var(--gold);
+        }
+
+        /* Form Control Glass */
+        .form-control, .form-select {
+            background: rgba(30, 30, 30, 0.6) !important;
+            border: 1px solid var(--border-gold);
+            color: var(--text-light) !important;
+        }
+
+        .form-control:focus, .form-select:focus {
+            background: rgba(40, 40, 40, 0.8) !important;
+            border-color: var(--gold);
+            color: var(--text-light);
+            box-shadow: 0 0 10px rgba(212, 175, 55, 0.3);
+        }
+
+        .text-muted {
+            color: #aaaaaa !important;
+        }
+
+        hr {
+            border-color: var(--border-gold);
+        }
+
+        /* Badge Gold */
+        .badge.bg-info {
+            background-color: rgba(212, 175, 55, 0.2) !important;
+            color: var(--gold) !important;
+            border: 1px solid var(--border-gold);
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg sticky-top mb-4">
+        <div class="container">
+            <a class="navbar-brand fw-bold tracking-wider" href="{{ url_for('index') }}">📖 Baros Diary</a>
+            <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto align-items-lg-center">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('index') }}">Beranda</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('kontak') }}">Kontak</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link btn btn-primary text-dark ms-lg-2 px-3 py-1 mt-2 mt-lg-0" href="{{ url_for('new_post') }}">Buat Postingan Baru</a>
+                    </li>
+                    {% if session.get('logged_in') %}
+                        <li class="nav-item ms-lg-2 mt-2 mt-lg-0">
+                            <a class="nav-link text-danger" href="{{ url_for('logout') }}">Logout</a>
+                        </li>
+                    {% else %}
+                        <li class="nav-item ms-lg-2 mt-2 mt-lg-0">
+                            <a class="nav-link" href="{{ url_for('login') }}">Login</a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mb-5 flex-grow-1">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ 'danger' if category == 'danger' else 'warning' if category == 'warning' else 'success' }} bg-dark text-light border-gold alert-dismissible fade show" role="alert" style="border: 1px solid var(--border-gold);">
+                        {{ message }}
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- Footer Copyright -->
+    <footer class="text-center py-4 mt-auto" style="border-top: 1px solid var(--border-gold); color: var(--gold); background: rgba(10, 10, 10, 0.9);">
+        Copyright © 2026 Baros. All rights reserved.
+    </footer>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
