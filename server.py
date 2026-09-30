@@ -7,7 +7,12 @@ from PIL import Image
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///journal.db'
+
+# Konfigurasi Database & Upload
+basedir = os.path.abspath(os.path.dirname(__file__))
+os.makedirs(os.path.join(basedir, 'instance'), exist_ok=True)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'instance', 'journal.db')
 app.config['SECRET_KEY'] = 'kunci-rahasia-anda'
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # Max 16MB
@@ -30,7 +35,6 @@ class Post(db.Model):
     content = db.Column(db.Text, nullable=False)
     category = db.Column(db.String(50), nullable=False, default='Jurnal Harian')
     image_file = db.Column(db.String(100), nullable=True)
-    # PERBAIKAN: Gunakan datetime.now untuk Python 3.14+
     date_posted = db.Column(db.DateTime, nullable=False, default=datetime.now)
     comments = db.relationship(
         'Comment', backref='post', lazy=True, cascade='all, delete-orphan'
@@ -41,7 +45,6 @@ class Comment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     author = db.Column(db.String(50), nullable=False)
     content = db.Column(db.Text, nullable=False)
-    # PERBAIKAN: Gunakan datetime.now
     date_posted = db.Column(db.DateTime, nullable=False, default=datetime.now)
     post_id = db.Column(db.Integer, db.ForeignKey('post.id'), nullable=False)
 
@@ -51,7 +54,6 @@ class ContactMessage(db.Model):
     name = db.Column(db.String(50), nullable=False)
     email = db.Column(db.String(100), nullable=False)
     message = db.Column(db.Text, nullable=False)
-    # PERBAIKAN: Gunakan datetime.now
     date_posted = db.Column(db.DateTime, nullable=False, default=datetime.now)
 
 
@@ -271,4 +273,5 @@ def logout():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8080, debug=False)
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host='0.0.0.0', port=port, debug=False)
