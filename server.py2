@@ -1,0 +1,144 @@
+import os
+from flask import Flask, request, render_template, redirect, url_for, flash, session
+from sqlalchemy import create_engine, text
+import cloudinary
+import cloudinary.uploader
+
+app = Flask(__name__)
+
+# Mengambil Secret Key Flask dari Environment Variable (atau fallback aman)
+app.secret_key = os.environ.get('SECRET_KEY', 'laskafun-secret-key-default')
+
+# ---------------------------------------------------------------------------
+# 1. KONFIGURASI DATABASE (SUPABASE) & CLOUDINARY
+# ---------------------------------------------------------------------------
+# Konfigurasi Cloudinary membaca otomatis variabel CLOUDINARY_URL
+cloudinary.config(secure=True)
+
+# Membaca DATABASE_URL dari Railway Variables
+db_url = os.environ.get('DATABASE_URL')
+
+# Menyesuaikan prefix URL agar kompatibel dengan pg8000
+if db_url and db_url.startswith("postgresql://"):
+    db_url = db_url.replace("postgresql://", "postgresql+pg8000://", 1)
+
+# Inisialisasi Engine Database SQLAlchemy
+engine = create_engine(db_url) if db_url else None
+
+def init_db():
+    """Membuat tabel 'posts' di Supabase secara otomatis jika belum ada."""
+    if engine:
+        with engine.connect() as conn:
+            conn.execute(text('''
+                CREATE TABLE IF NOT EXISTS posts (
+                    id SERIAL PRIMARY KEY,
+                    title VARCHAR(255) NOT NULL,
+                    content TEXT NOT NULL,
+                    image_url TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            '''))
+            conn.commit()
+
+# Jalankan pembuatan tabel saat aplikasi dimulai
+try:
+    init_db()
+    print("[INFO] Database Supabase terhubung & diinisialisasi.")
+except Exception as e:
+    print(f"[ERROR] Inisialisasi Database Gagal: {e}")
+
+# ---------------------------------------------------------------------------
+# 2. ROUTE UTAMA & SIKLUS POSTINGAN
+# ---------------------------------------------------------------------------
+@app.route('/')
+def index():
+    """Menampilkan semua postingan dari Supabase."""
+    posts = []
+    if engine:
+        try:
+            with engine.connect() as conn:
+                result = conn.execute(text("SELECT * FROM posts ORDER BY id DESC"))
+                posts = result.mappings().all()
+        except Exception as e:
+            print(f"[ERROR] Gagal mengambil postingan: {e}")
+            
+    return render_template('index.html', posts=posts)
+
+@app.route('/create', methods=['GET', 'POST'])
+def create():
+    """Membuat postingan baru (Teks ke Supabase + Foto ke Cloudinary)."""
+    # Proteksi: Hanya Admin yang sudah login yang bisa buat postingan
+    if not session.get('logged_in'):
+        flash('Silakan login terlebih dahulu!', 'danger')
+        return redirect(url_for('login'))
+
+    if request.method == 'POST':
+        title = request.form.get('title')
+        content = request.form.get('content')
+        file_to_upload = request.files.get('file')
+
+        image_url = None
+        # Upload foto ke Cloudinary jika ada file yang dipilih
+        if file_to_upload and file_to_upload.filename != '':
+            try:
+                upload_result = cloudinary.uploader.upload(file_to_upload)
+                image_url = upload_result.get('secure_url')
+            except Exception as e:
+                print(f"[ERROR] Upload Cloudinary Gagal: {e}")
+                flash('Gagal mengunggah gambar!', 'danger')
+
+        # Simpan Teks & Link Foto ke Supabase PostgreSQL
+        if engine:
+            try:
+                with engine.connect() as conn:
+                    conn.execute(
+                        text("INSERT INTO posts (title, content, image_url) VALUES (:title, :content, :image_url)"),
+                        {"title": title, "content": content, "image_url": image_url}
+                    )
+                    conn.commit()
+                flash('Postingan berhasil dibuat!', 'success')
+                return redirect(url_for('index'))
+            except Exception as e:
+                print(f"[ERROR] Gagal menyimpan ke DB: {e}")
+                flash('Terjadi kesalahan saat menyimpan postingan.', 'danger')
+
+    return render_template('create.html')
+
+# ---------------------------------------------------------------------------
+# 3. ROUTE AUTENTIKASI ADMIN (KEAMANAN KHUSUS)
+# ---------------------------------------------------------------------------
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """Sistem Login Admin membaca Kredensial murni dari Railway Variables."""
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+
+        # Murni membaca dari Environment Variable tanpa password hardcoded di kode
+        admin_user = os.environ.get('ADMIN_USER')
+        admin_pass = os.environ.get('ADMIN_PASS')
+
+        if admin_user and admin_pass and username == admin_user and password == admin_pass:
+            session['logged_in'] = True
+            flash('Berhasil login sebagai Admin!', 'success')
+            return redirect(url_for('index'))
+        else:
+            flash('Username atau Password salah!', 'danger')
+            return redirect(url_for('login'))
+
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    """Logout Admin."""
+    session.pop('logged_in', None)
+    flash('Kamu telah keluar.', 'info')
+    return redirect(url_for('index'))
+
+# ---------------------------------------------------------------------------
+# 4. JALANKAN APLIKASI
+# ---------------------------------------------------------------------------
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
+
