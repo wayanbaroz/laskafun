@@ -1,0 +1,133 @@
+/* ==========================================================
+   theme.css  Token desain + primitif neumorphism (light)
+   Cahaya jatuh dari kiri atas: bayangan putih di kiri atas,
+   bayangan abu kebiruan di kanan bawah.
+   ========================================================== */
+:root {
+  color-scheme: light;
+
+  --bg: #e0e5ec;
+  --hi: #ffffff;
+  --lo: #a3b1c6;
+
+  --ink: #39455a;
+  --ink-2: #55627a;
+  --ink-3: #7a869c;
+
+  --warm-1: #ff4d5e;
+  --warm-2: #ff9a5a;
+  --warm-ink: #e2354d;
+  --warm-ink-2: #ee6a2c;
+  --mint-1: #17c999;
+  --mint-2: #6bf0b8;
+  --blue-1: #2f8cff;
+  --blue-2: #38d5ff;
+
+  --g-warm: linear-gradient(135deg, var(--warm-1), var(--warm-2));
+  --g-mint: linear-gradient(135deg, var(--mint-1), var(--mint-2));
+  --g-blue: linear-gradient(135deg, var(--blue-1), var(--blue-2));
+  --g-tri: linear-gradient(90deg, var(--warm-1), var(--warm-2) 38%, var(--mint-1) 70%, var(--blue-1));
+
+  --raise-s: 5px 5px 10px var(--lo), -5px -5px 10px var(--hi);
+  --raise-m: 9px 9px 18px var(--lo), -9px -9px 18px var(--hi);
+  --raise-l: 14px 14px 28px var(--lo), -14px -14px 28px var(--hi);
+  --sink-s: inset 4px 4px 8px var(--lo), inset -4px -4px 8px var(--hi);
+  --sink-m: inset 7px 7px 14px var(--lo), inset -7px -7px 14px var(--hi);
+
+  --font-display: 'Sora', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-body: 'DM Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'DM Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  --r-card: 28px;
+  --ease: cubic-bezier(.3, .7, .2, 1);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+html, body { margin: 0; min-height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 400 16px/1.45 var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+body.no-scroll { overflow: hidden; }
+[hidden] { display: none !important; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; cursor: pointer; touch-action: manipulation; }
+h1, h2, h3, p, ul, ol { margin: 0; padding: 0; }
+ul, ol { list-style: none; }
+.sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Ikon */
+.ico {
+  width: 22px; height: 22px; flex: none;
+  fill: none; stroke: currentColor; stroke-width: 1.9;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+.ico.f { fill: currentColor; }
+.ico-lg { width: 30px; height: 30px; }
+.ico-xl { width: 40px; height: 40px; }
+
+/* Permukaan */
+.neu { background: var(--bg); box-shadow: var(--raise-m); }
+.neu-in { background: var(--bg); box-shadow: var(--sink-m); }
+
+/* Tombol bulat timbul */
+.btn {
+  display: inline-grid; place-items: center; position: relative;
+  border-radius: 50%; background: var(--bg); color: var(--ink-2);
+  box-shadow: var(--raise-s);
+  transition: box-shadow .16s var(--ease), transform .16s var(--ease), color .16s;
+  -webkit-user-select: none; user-select: none;
+}
+.btn:active:not(:disabled), .btn.is-on, .btn[aria-pressed="true"] { box-shadow: var(--sink-s); }
+.btn:disabled { opacity: .38; cursor: default; }
+.btn-round { width: var(--s, 48px); height: var(--s, 48px); }
+.btn-xs { --s: 32px; }
+.btn-sm { --s: 40px; }
+.btn-md { --s: clamp(38px, 11vw, 46px); }
+.btn-lg { --s: clamp(46px, 14vw, 58px); }
+
+/* Tombol pil */
+.btn-pill {
+  display: inline-flex; align-items: center; gap: 8px;
+  height: 46px; padding: 0 20px; border-radius: 999px;
+  background: var(--bg); color: var(--ink);
+  font: 600 .88rem var(--font-body);
+  box-shadow: var(--raise-s);
+  transition: box-shadow .16s var(--ease);
+}
+.btn-pill:active:not(:disabled) { box-shadow: var(--sink-s); }
+.btn-pill:disabled { opacity: .45; }
+
+:where(.btn, .btn-pill, .dial-btn, .tap-btn, .seg-btn, .menu-item, .row-main, .sync-line):focus-visible,
+:where(.seek, .vol-svg, .lyrics-scroll):focus-visible {
+  outline: 2px solid var(--blue-1); outline-offset: 3px;
+}
+
+/* Kolom isian */
+.field {
+  width: 100%; border: 0; border-radius: 20px; background: transparent;
+  padding: 14px 18px; color: var(--ink);
+  font: 500 .95rem/1.5 var(--font-body);
+  box-shadow: var(--sink-s); outline: none;
+}
+.field::placeholder { color: var(--ink-3); }
+.field:focus { box-shadow: var(--sink-s), 0 0 0 2px rgba(47, 140, 255, .45); }
+.area { resize: vertical; min-height: 200px; }
+.field-label { font: 600 .78rem var(--font-body); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); }
+
+.eyebrow { font: 600 .68rem var(--font-body); letter-spacing: .2em; text-transform: uppercase; color: var(--ink-2); }
+.hint { font-size: .8rem; color: var(--ink-2); line-height: 1.5; }
+.chip {
+  display: inline-flex; align-items: center; height: 26px; padding: 0 12px; border-radius: 999px;
+  font: 600 .7rem var(--font-body); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2);
+  box-shadow: var(--sink-s);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
