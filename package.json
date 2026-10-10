@@ -1,7 +1,0 @@
-{
-  "name": "privchat",
-  "version": "1.0.0",
-  "description": "Chat privat 2 orang, realtime, E2E terenkripsi, tanpa penyimpanan, tanpa dependensi",
-  "main": "server.js",
-  "scripts": { "start": "node server.js" }
-}

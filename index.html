@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#e2e7dd">
+<title>Timbangan Tani</title>
+
+<!-- Chart.js via CDN (butuh internet hanya untuk diagram; fitur lain jalan offline) -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<style>
+/* ============ TEMA WARNA (EDIT DI SINI) ============ */
+:root, [data-theme="light"]{
+  --bg:#e2e7dd;      /* warna dasar */
+  --sl:#f6faf1;      /* bayangan terang */
+  --sd:#bac1b4;      /* bayangan gelap */
+  --tx:#2a342c;      /* teks */
+  --mut:#6a7668;     /* teks redup */
+  --ac:#2f7d4f;      /* aksen hijau daun */
+  --ac2:#b0701a;     /* aksen getah/kuning tua */
+  --danger:#b4443a;
+  --grid:rgba(42,52,44,.12);
+}
+[data-theme="dark"]{
+  --bg:#222823;
+  --sl:#2d352e;
+  --sd:#171b18;
+  --tx:#e4eadf;
+  --mut:#93a190;
+  --ac:#6fcf97;
+  --ac2:#e2a84b;
+  --danger:#ef7b70;
+  --grid:rgba(228,234,223,.12);
+}
+:root{
+  --out: 6px 6px 14px var(--sd), -6px -6px 14px var(--sl);
+  --out-s: 3px 3px 7px var(--sd), -3px -3px 7px var(--sl);
+  --in: inset 4px 4px 9px var(--sd), inset -4px -4px 9px var(--sl);
+}
+
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--tx);
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:16px;line-height:1.4;
+  transition:background .2s,color .2s}
+button,input,select,textarea{font:inherit;color:inherit}
+
+.app{max-width:480px;margin:0 auto;min-height:100dvh;
+  padding:calc(env(safe-area-inset-top,0px) + 16px) 16px calc(104px + env(safe-area-inset-bottom,0px))}
+
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+h1{font-size:1.3rem;margin:0;letter-spacing:.2px}
+.sub{margin:2px 0 0;color:var(--mut);font-size:.82rem}
+h2{font-size:1rem;margin:0 0 12px}
+
+.tab{display:none}
+.tab.active{display:block}
+
+/* ============ KOMPONEN NEUMORPHISM ============ */
+.card{background:var(--bg);border-radius:24px;padding:16px;margin-bottom:18px;box-shadow:var(--out)}
+.btn{border:0;background:var(--bg);color:var(--tx);border-radius:16px;box-shadow:var(--out-s);
+  font-weight:600;padding:12px 14px;cursor:pointer;transition:box-shadow .12s,color .12s}
+.btn:active,.btn.on{box-shadow:inset 3px 3px 7px var(--sd),inset -3px -3px 7px var(--sl)}
+.btn.primary{color:var(--ac)}
+.btn.danger{color:var(--danger)}
+.btn.sm{padding:8px 12px;font-size:.82rem;border-radius:13px}
+.btn.round{width:46px;height:46px;border-radius:50%;padding:0;font-size:1.2rem;display:grid;place-items:center}
+.btn:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+
+label{display:block;font-size:.78rem;color:var(--mut);margin:0 0 6px 4px}
+.field{margin-bottom:12px}
+input,select,textarea{width:100%;border:0;outline:0;background:var(--bg);padding:12px 14px;border-radius:15px;box-shadow:var(--in)}
+input::placeholder,textarea::placeholder{color:var(--mut);opacity:.7}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row > .btn{flex:1}
+
+/* ============ KALKULATOR BIASA ============ */
+.display{border-radius:22px;box-shadow:var(--in);padding:16px 18px;text-align:right;min-height:124px;
+  display:flex;flex-direction:column;justify-content:flex-end;gap:6px;margin-bottom:20px}
+.dsub{color:var(--mut);font-size:.95rem;min-height:1.4em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dmain{font-size:2.3rem;font-weight:700;white-space:nowrap;overflow-x:auto;scrollbar-width:none;
+  font-variant-numeric:tabular-nums}
+.dmain::-webkit-scrollbar{display:none}
+.keys{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.key{height:64px;border-radius:20px;font-size:1.3rem;padding:0}
+.key.op{color:var(--ac2)}
+.key.fn{color:var(--mut)}
+.key.eq{background:var(--ac);color:var(--bg);box-shadow:var(--out-s)}
+.key.eq:active{box-shadow:inset 3px 3px 7px rgba(0,0,0,.3),inset -2px -2px 5px rgba(255,255,255,.15)}
+
+/* ============ KALKULATOR TIMBANGAN ============ */
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.chip{border:0;background:var(--bg);box-shadow:var(--out-s);border-radius:12px;padding:6px 12px;font-size:.88rem;cursor:pointer}
+.chip.bad{color:var(--danger)}
+.hint{font-size:.76rem;color:var(--mut);margin:10px 4px 0}
+.sumbox{border-radius:18px;box-shadow:var(--in);padding:14px 16px;margin-top:14px;font-weight:700;font-size:1.05rem;
+  font-variant-numeric:tabular-nums}
+.break{margin:2px 0 14px}
+.break div{display:flex;justify-content:space-between;gap:10px;padding:6px 4px;font-size:.9rem;color:var(--mut);
+  font-variant-numeric:tabular-nums}
+.break div b{color:var(--tx);font-weight:600;text-align:right}
+.total{border-radius:20px;box-shadow:var(--in);padding:16px;text-align:center}
+.total small{display:block;color:var(--mut);font-size:.8rem;margin-bottom:4px}
+.total strong{font-size:1.85rem;color:var(--ac);font-variant-numeric:tabular-nums}
+
+/* ============ RIWAYAT ============ */
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px}
+.stat{border-radius:18px;box-shadow:var(--out-s);padding:12px 8px;text-align:center}
+.stat b{display:block;font-size:.98rem;font-variant-numeric:tabular-nums}
+.stat span{font-size:.7rem;color:var(--mut)}
+.seg{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.chartbox{position:relative;height:240px;border-radius:18px;box-shadow:var(--in);padding:10px}
+.empty{color:var(--mut);text-align:center;padding:22px 10px;font-size:.9rem}
+.tx{border-radius:22px;box-shadow:var(--out);padding:16px;margin-bottom:16px}
+.tx-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.tx-name{font-weight:700;font-size:1.05rem}
+.tx-date{font-size:.78rem;color:var(--mut)}
+.badge{font-size:.72rem;padding:4px 10px;border-radius:10px;box-shadow:var(--in);color:var(--ac2);white-space:nowrap}
+.tx-w{margin:10px 0;font-size:.85rem;color:var(--mut);word-break:break-word}
+.tx-nums{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px}
+.tx-nums b{font-size:1.15rem;color:var(--ac)}
+.tx-nums span{font-size:.9rem}
+
+/* ============ NAVIGASI BAWAH ============ */
+.nav{position:fixed;left:50%;bottom:0;transform:translateX(-50%);width:min(100%,480px);background:var(--bg);
+  display:grid;grid-template-columns:repeat(4,1fr);gap:10px;
+  padding:10px 14px calc(10px + env(safe-area-inset-bottom,0px));z-index:5}
+.nav .btn{display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 2px;font-size:.68rem;font-weight:600;color:var(--mut)}
+.nav .btn.on{color:var(--ac)}
+.nav svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+/* ============ MODAL & TOAST ============ */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:18px;z-index:20}
+.modal[hidden]{display:none}
+.dialog{background:var(--bg);border-radius:24px;box-shadow:var(--out);padding:18px;width:100%;max-width:440px}
+.dialog textarea{height:230px;resize:none;font-size:.85rem;font-family:ui-monospace,Menlo,Consolas,monospace;margin-bottom:12px}
+.toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);
+  background:var(--bg);box-shadow:var(--out);border-radius:16px;padding:10px 18px;font-size:.86rem;z-index:30;
+  max-width:90%;text-align:center}
+.toast[hidden]{display:none}
+
+/* ============ CETAK ============ */
+#printArea{display:none}
+@media print{
+  .app,.nav,.modal,.toast{display:none !important}
+  #printArea{display:block;white-space:pre-wrap;font:14px/1.5 ui-monospace,Menlo,Consolas,monospace;color:#000;background:#fff;padding:12px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none !important}}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="top">
+    <div>
+      <!-- EDIT DI SINI: judul aplikasi -->
+      <h1>Kalkulator Tani</h1>
+      <p class="sub">Kalkulator smart karet, jagung dan umum</p>
+    </div>
+    <button id="themeBtn" class="btn round" aria-label="Ganti mode terang atau gelap">☾</button>
+  </header>
+
+  <main>
+    <!-- ===== TAB 1: KALKULATOR BIASA ===== -->
+    <section id="tab-calc" class="tab active" aria-label="Kalkulator biasa">
+      <div class="display" aria-live="polite">
+        <div class="dsub" id="dsub"></div>
+        <div class="dmain" id="dmain">0</div>
+      </div>
+      <div class="keys" id="keys">
+        <button class="btn key fn" data-k="C">C</button>
+        <button class="btn key fn" data-k="DEL" aria-label="Hapus satu karakter">⌫</button>
+        <button class="btn key fn" data-k="%">%</button>
+        <button class="btn key op" data-k="÷">÷</button>
+
+        <button class="btn key" data-k="7">7</button>
+        <button class="btn key" data-k="8">8</button>
+        <button class="btn key" data-k="9">9</button>
+        <button class="btn key op" data-k="×">×</button>
+
+        <button class="btn key" data-k="4">4</button>
+        <button class="btn key" data-k="5">5</button>
+        <button class="btn key" data-k="6">6</button>
+        <button class="btn key op" data-k="−">−</button>
+
+        <button class="btn key" data-k="1">1</button>
+        <button class="btn key" data-k="2">2</button>
+        <button class="btn key" data-k="3">3</button>
+        <button class="btn key op" data-k="+">+</button>
+
+        <button class="btn key" data-k="00">00</button>
+        <button class="btn key" data-k="0">0</button>
+        <button class="btn key" data-k=".">,</button>
+        <button class="btn key eq" data-k="=">=</button>
+      </div>
+    </section>
+
+    <!-- ===== TAB 2 & 3: dibuat otomatis oleh JavaScript dari TYPES ===== -->
+    <section id="tab-karet" class="tab" aria-label="Timbangan karet"></section>
+    <section id="tab-jagung" class="tab" aria-label="Timbangan jagung dan komoditas lain"></section>
+
+    <!-- ===== TAB 4: RIWAYAT & STATISTIK ===== -->
+    <section id="tab-riwayat" class="tab" aria-label="Riwayat dan statistik">
+      <div class="stats">
+        <div class="stat"><b id="stCount">0</b><span>Transaksi</span></div>
+        <div class="stat"><b id="stKg">0 kg</b><span>Berat bersih</span></div>
+        <div class="stat"><b id="stRp">Rp 0</b><span>Total bayar</span></div>
+      </div>
+
+      <div class="card">
+        <h2>Diagram rekap</h2>
+        <div class="seg" id="segType">
+          <button class="btn sm on" data-v="all">Semua</button>
+          <button class="btn sm" data-v="karet">Karet</button>
+          <button class="btn sm" data-v="jagung">Jagung/lain</button>
+        </div>
+        <div class="seg" id="segGroup">
+          <button class="btn sm on" data-v="nama">Per petani</button>
+          <button class="btn sm" data-v="tanggal">Per tanggal</button>
+        </div>
+        <div class="seg" id="segMetric">
+          <button class="btn sm on" data-v="total">Total Rp</button>
+          <button class="btn sm" data-v="kg">Berat kg</button>
+        </div>
+        <div class="seg" id="segChart">
+          <button class="btn sm on" data-v="bar">Batang</button>
+          <button class="btn sm" data-v="line">Garis</button>
+        </div>
+        <div class="chartbox"><canvas id="chart"></canvas></div>
+        <p class="hint" id="chartMsg" hidden></p>
+      </div>
+
+      <div class="row" style="margin-bottom:18px">
+        <button class="btn primary" id="exportAll">Ekspor semua</button>
+        <button class="btn danger" id="clearAll">Hapus semua</button>
+      </div>
+
+      <div id="list"></div>
+    </section>
+  </main>
+</div>
+
+<!-- ===== NAVIGASI BAWAH ===== -->
+<nav class="nav" aria-label="Menu utama">
+  <button class="btn on" data-tab="calc">
+    <svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="3"/><path d="M8 8h8M9 13h.01M12 13h.01M15 13h.01M9 17h.01M12 17h.01M15 17h.01"/></svg>Kalkulator
+  </button>
+  <button class="btn" data-tab="karet">
+    <svg viewBox="0 0 24 24"><path d="M12 3c3 4 6 7 6 11a6 6 0 0 1-12 0c0-4 3-7 6-11z"/></svg>Karet
+  </button>
+  <button class="btn" data-tab="jagung">
+    <svg viewBox="0 0 24 24"><path d="M5 19c0-9 5-14 14-14 0 9-5 14-14 14zM5 19l7-7"/></svg>Jagung
+  </button>
+  <button class="btn" data-tab="riwayat">
+    <svg viewBox="0 0 24 24"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>Riwayat
+  </button>
+</nav>
+
+<!-- ===== MODAL RINGKASAN ===== -->
+<div class="modal" id="modal" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-label="Ringkasan transaksi">
+    <h2>Ringkasan</h2>
+    <textarea id="modalText" readonly></textarea>
+    <div class="row">
+      <button class="btn primary" id="mCopy">Salin</button>
+      <button class="btn primary" id="mWa">WhatsApp</button>
+      <button class="btn" id="mPrint">Cetak</button>
+      <button class="btn" id="mClose">Tutup</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+<div id="printArea"></div>
+
+<script>
+(function(){
+'use strict';
+
+/* =====================================================================
+   PENGATURAN JENIS TIMBANGAN  (EDIT DI SINI)
+   - Tambah komoditas baru: salin salah satu blok, beri key baru,
+     lalu tambahkan <section id="tab-KEY" class="tab"> dan tombol nav di HTML.
+   - fields: kolom tara / potongan. 'air' + 'std' = potongan kadar air otomatis
+     (hanya kelebihan di atas standar yang dipotong).
+   ===================================================================== */
+var TYPES = {
+  karet: {
+    label: 'Karet', item: null, unit: 'Bal',
+    fields: [
+      { id:'tara',   label:'Tara per bal (kg)',          def:'0' },
+      { id:'potong', label:'Potongan susut / kotoran (%)', def:'0' }
+    ]
+  },
+  jagung: {
+    label: 'Jagung', item: 'Jagung', unit: 'Karung',
+    fields: [
+      { id:'tara',   label:'Tara per karung (kg)',        def:'0,5' },
+      { id:'air',    label:'Kadar air terukur (%)',       def:'',   ph:'contoh 18' },
+      { id:'std',    label:'Standar kadar air (%)',       def:'14' },
+      { id:'potong', label:'Potongan lain (%)',           def:'0' }
+    ]
+  }
+};
+var STORE_KEY = 'timbanganTani.v1';
+
+/* ---------- Helper ---------- */
+function $(s, r){ return (r||document).querySelector(s); }
+function $$(s, r){ return Array.prototype.slice.call((r||document).querySelectorAll(s)); }
+function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function fmtRp(n){ return 'Rp ' + Math.round(n).toLocaleString('id-ID'); }
+function fmtNum(n, d){ d = d==null ? 2 : d; var p = Math.pow(10,d); return (Math.round(n*p)/p).toLocaleString('id-ID',{maximumFractionDigits:d}); }
+function numVal(v){ var n = parseFloat(String(v).replace(',', '.')); return isFinite(n) ? n : 0; }
+function nowLocal(){ var d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0,16); }
+function fmtDate(s){
+  var d = new Date(s);
+  if (isNaN(d)) return s;
+  return d.toLocaleString('id-ID',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+var toastTimer;
+function toast(msg){
+  var t = $('#toast'); t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(function(){ t.hidden = true; }, 2200);
+}
+
+/* ---------- Tema terang / gelap ---------- */
+function applyTheme(t){
+  document.documentElement.setAttribute('data-theme', t);
+  $('#themeBtn').textContent = t === 'dark' ? '☀' : '☾';
+  $('meta[name="theme-color"]').setAttribute('content', t === 'dark' ? '#222823' : '#e2e7dd');
+  try { localStorage.setItem('timbanganTani.theme', t); } catch(e){}
+  if ($('#tab-riwayat').classList.contains('active')) renderHistory();
+}
+(function initTheme(){
+  var t = null;
+  try { t = localStorage.getItem('timbanganTani.theme'); } catch(e){}
+  if (!t) t = (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+  applyTheme(t);
+})();
+$('#themeBtn').addEventListener('click', function(){
+  applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+});
+
+/* ---------- Navigasi tab ---------- */
+function showTab(id){
+  $$('.tab').forEach(function(s){ s.classList.toggle('active', s.id === 'tab-' + id); });
+  $$('.nav .btn').forEach(function(b){ b.classList.toggle('on', b.dataset.tab === id); });
+  if (id === 'riwayat') renderHistory();
+  window.scrollTo(0,0);
+}
+$$('.nav .btn').forEach(function(b){ b.addEventListener('click', function(){ showTab(b.dataset.tab); }); });
+
+/* =====================================================================
+   TAB 1 - KALKULATOR BIASA
+   ===================================================================== */
+var expr = '', prevExpr = '', justEq = false;
+var OPS = '+−×÷';
+
+function evalExpr(s){
+  var tokens = s.match(/\d+\.?\d*|\.\d+|[+−×÷()%]/g) || [];
+  if (tokens.join('').length !== s.length || !tokens.length) return null;
+  var i = 0;
+  function peek(){ return tokens[i]; }
+  function parseExpr(){
+    var a = parseTerm();
+    while (peek() === '+' || peek() === '−'){
+      var op = tokens[i++], b = parseTerm();
+      var bv = b.v;
+      if (b.pct) bv = a.v * b.v;           // 50 + 10% = 55
+      a = { v: op === '+' ? a.v + bv : a.v - bv, pct:false };
+    }
+    return a;
+  }
+  function parseTerm(){
+    var a = parseUnary();
+    while (peek() === '×' || peek() === '÷'){
+      var op = tokens[i++], b = parseUnary();
+      a = { v: op === '×' ? a.v * b.v : a.v / b.v, pct:false };
+    }
+    return a;
+  }
+  function parseUnary(){
+    if (peek() === '−'){ i++; var u = parseUnary(); return { v:-u.v, pct:u.pct }; }
+    var p = parsePrimary();
+    while (peek() === '%'){ i++; p = { v:p.v/100, pct:true }; }
+    return p;
+  }
+  function parsePrimary(){
+    var t = tokens[i++];
+    if (t === undefined) throw new Error('x');
+    if (t === '('){ var e = parseExpr(); if (tokens[i++] !== ')') throw new Error('x'); return e; }
+    var n = parseFloat(t);
+    if (isNaN(n)) throw new Error('x');
+    return { v:n, pct:false };
+  }
+  try {
+    var r = parseExpr();
+    if (i !== tokens.length || !isFinite(r.v)) return null;
+    return r.v;
+  } catch(e){ return null; }
+}
+function fmtRes(r){ return String(parseFloat(r.toPrecision(12))).replace('-', '−'); }
+function showCalc(msg){
+  var disp = function(s){ return s.replace(/\./g, ','); };
+  $('#dmain').textContent = disp(expr) || '0';
+  var sub = '';
+  if (msg) sub = msg;
+  else if (justEq) sub = disp(prevExpr) + ' =';
+  else if (/[+−×÷%]/.test(expr)){
+    var r = evalExpr(expr);
+    if (r !== null) sub = '= ' + disp(fmtRes(r));
+  }
+  $('#dsub').textContent = sub;
+  var m = $('#dmain'); m.scrollLeft = m.scrollWidth;
+}
+function press(k){
+  if (k === 'C'){ expr = ''; justEq = false; }
+  else if (k === 'DEL'){ expr = justEq ? '' : expr.slice(0,-1); justEq = false; }
+  else if (k === '='){
+    if (!expr) return;
+    var r = evalExpr(expr);
+    if (r === null){ showCalc('Perhitungan tidak valid'); return; }
+    prevExpr = expr; expr = fmtRes(r); justEq = true;
+  }
+  else if (OPS.indexOf(k) > -1){
+    if (!expr){ if (k === '−') expr = '−'; }
+    else {
+      var last = expr.slice(-1);
+      if (OPS.indexOf(last) > -1){
+        if (expr.length > 1) expr = expr.slice(0,-1) + k;
+      } else expr += k;
+    }
+    justEq = false;
+  }
+  else if (k === '%'){
+    if (/[\d%]$/.test(expr)) expr += '%';
+    justEq = false;
+  }
+  else {                                     // angka, 00, titik
+    if (expr.length >= 40) return;
+    if (justEq){ expr = ''; justEq = false; }
+    if (expr.slice(-1) === '%') return;
+    var seg = expr.split(/[+−×÷]/).pop();
+    if (k === '.'){
+      if (seg.indexOf('.') > -1) return;
+      expr += seg === '' ? '0.' : '.';
+    } else if (seg === '0'){
+      if (k !== '00') expr = expr.slice(0,-1) + k;
+    } else if (seg === '' && k === '00'){
+      expr += '0';
+    } else expr += k;
+  }
+  showCalc();
+}
+$$('#keys .key').forEach(function(b){ b.addEventListener('click', function(){ press(b.dataset.k); }); });
+document.addEventListener('keydown', function(e){
+  if (!$('#tab-calc').classList.contains('active')) return;
+  if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+  var k = e.key;
+  if (/^[0-9]$/.test(k)) press(k);
+  else if (k === '.' || k === ',') press('.');
+  else if (k === '+') press('+');
+  else if (k === '-') press('−');
+  else if (k === '*' || k === 'x') press('×');
+  else if (k === '/') { e.preventDefault(); press('÷'); }
+  else if (k === '%') press('%');
+  else if (k === 'Enter' || k === '=') press('=');
+  else if (k === 'Backspace') press('DEL');
+  else if (k === 'Escape') press('C');
+});
+showCalc();
+
+/* =====================================================================
+   TAB 2 & 3 - KALKULATOR TIMBANGAN (dibuat dari TYPES)
+   ===================================================================== */
+function panelHTML(key){
+  var c = TYPES[key];
+  var fields = c.fields.map(function(f){
+    return '<div class="field"><label for="'+key+'-'+f.id+'">'+f.label+'</label>' +
+      '<input id="'+key+'-'+f.id+'" data-f="'+f.id+'" type="text" inputmode="decimal" autocomplete="off" ' +
+      'value="'+f.def+'" placeholder="'+(f.ph||'0')+'"></div>';
+  }).join('');
+  return '' +
+  '<div class="card">' +
+    '<h2>Data transaksi</h2>' +
+    '<div class="field"><label for="'+key+'-nama">Nama penjual / petani</label>' +
+      '<input id="'+key+'-nama" type="text" autocomplete="off" placeholder="Contoh: Made"></div>' +
+    (c.item ? '<div class="field"><label for="'+key+'-item">Komoditas</label>' +
+      '<input id="'+key+'-item" type="text" autocomplete="off" value="'+c.item+'"></div>' : '') +
+    '<div class="grid2">' +
+      '<div class="field"><label for="'+key+'-harga">Harga per kg (Rp)</label>' +
+        '<input id="'+key+'-harga" type="text" inputmode="numeric" autocomplete="off" placeholder="0"></div>' +
+      '<div class="field"><label for="'+key+'-tgl">Tanggal dan waktu</label>' +
+        '<input id="'+key+'-tgl" type="datetime-local"></div>' +
+    '</div>' +
+  '</div>' +
+  '<div class="card">' +
+    '<h2>Rincian berat (kg)</h2>' +
+    '<label for="'+key+'-w">Ketik angka, pisahkan dengan spasi</label>' +
+    '<input id="'+key+'-w" type="text" inputmode="decimal" autocomplete="off" placeholder="20 20 10">' +
+    '<div class="row" style="margin-top:10px">' +
+      '<button class="btn sm" data-act="space">Spasi</button>' +
+      '<button class="btn sm" data-act="undo">Hapus angka terakhir</button>' +
+    '</div>' +
+    '<div class="chips" id="'+key+'-chips"></div>' +
+    '<p class="hint" id="'+key+'-hint" hidden>Ketuk sebuah angka untuk menghapusnya.</p>' +
+    '<div class="sumbox" id="'+key+'-sum">Total Berat: 0 kg (0 '+c.unit+')</div>' +
+  '</div>' +
+  '<div class="card">' +
+    '<h2>Tara dan potongan</h2>' +
+    '<div class="grid2">' + fields + '</div>' +
+  '</div>' +
+  '<div class="card">' +
+    '<div class="break" id="'+key+'-break"></div>' +
+    '<div class="total"><small>Total pembayaran</small><strong id="'+key+'-total">Rp 0</strong></div>' +
+  '</div>' +
+  '<div class="row" style="margin-bottom:18px">' +
+    '<button class="btn primary" data-act="save">Simpan transaksi</button>' +
+    '<button class="btn" data-act="reset">Kosongkan</button>' +
+  '</div>';
+}
+
+function readTokens(key){
+  var raw = $('#'+key+'-w').value.trim();
+  return raw ? raw.split(/\s+/) : [];
+}
+function tokenValue(t){
+  if (!/^(\d+([.,]\d*)?|[.,]\d+)$/.test(t)) return null;
+  var n = numVal(t);
+  return n > 0 ? n : null;
+}
+function getHarga(key){ return parseInt($('#'+key+'-harga').value.replace(/\D/g,''), 10) || 0; }
+function field(key, id){ var el = $('#'+key+'-'+id); return el ? numVal(el.value) : 0; }
+
+function compute(key){
+  var c = TYPES[key];
+  var tokens = readTokens(key);
+  var weights = [];
+  tokens.forEach(function(t){ var v = tokenValue(t); if (v !== null) weights.push(v); });
+  var count = weights.length;
+  var bruto = weights.reduce(function(a,b){ return a+b; }, 0);
+  var tara = field(key,'tara') * count;
+  var sub = Math.max(0, bruto - tara);
+  var airPct = 0;
+  var hasAir = c.fields.some(function(f){ return f.id === 'air'; });
+  if (hasAir){
+    var air = field(key,'air'), std = field(key,'std');
+    if (air > std) airPct = air - std;
+  }
+  var potPct = Math.min(100, airPct + field(key,'potong'));
+  var potKg = sub * potPct / 100;
+  var netto = sub - potKg;
+  var harga = getHarga(key);
+  return { tokens:tokens, weights:weights, count:count, bruto:bruto, tara:tara, taraPer:field(key,'tara'),
+           airPct:airPct, potPct:potPct, potKg:potKg, netto:netto, harga:harga, total:Math.round(netto*harga) };
+}
+
+function renderPanel(key){
+  var c = TYPES[key], r = compute(key);
+  // chip angka
+  var chips = $('#'+key+'-chips');
+  chips.innerHTML = r.tokens.map(function(t,i){
+    var ok = tokenValue(t) !== null;
+    return '<button class="chip'+(ok?'':' bad')+'" data-i="'+i+'" aria-label="Hapus '+esc(t)+'">'+esc(t)+'</button>';
+  }).join('');
+  $('#'+key+'-hint').hidden = !r.tokens.length;
+  // ringkasan real-time
+  $('#'+key+'-sum').textContent = 'Total Berat: ' + fmtNum(r.bruto) + ' kg (' + r.count + ' ' + c.unit + ')';
+  // rincian
+  var rows = [];
+  if (r.bruto > 0){
+    rows.push(['Berat kotor', fmtNum(r.bruto) + ' kg']);
+    if (r.tara > 0) rows.push(['Tara ('+r.count+' × '+fmtNum(r.taraPer)+' kg)', '− ' + fmtNum(r.tara) + ' kg']);
+    if (r.potPct > 0){
+      var lbl = 'Potongan ' + fmtNum(r.potPct) + '%';
+      if (r.airPct > 0) lbl += ' (air lebih ' + fmtNum(r.airPct) + '%)';
+      rows.push([lbl, '− ' + fmtNum(r.potKg) + ' kg']);
+    }
+    rows.push(['Berat bersih', fmtNum(r.netto) + ' kg']);
+    rows.push(['Harga per kg', fmtRp(r.harga)]);
+  }
+  $('#'+key+'-break').innerHTML = rows.length ? rows.map(function(x){
+    return '<div><span>'+esc(x[0])+'</span><b>'+esc(x[1])+'</b></div>';
+  }).join('') : '<div><span>Masukkan berat dan harga untuk melihat perhitungan.</span></div>';
+  $('#'+key+'-total').textContent = fmtRp(r.total);
+}
+
+function resetPanel(key, keepAll){
+  $('#'+key+'-w').value = '';
+  $('#'+key+'-nama').value = '';
+  $('#'+key+'-tgl').value = nowLocal();
+  if (!keepAll){ $('#'+key+'-harga').value = ''; }
+  renderPanel(key);
+}
+
+function savePanel(key){
+  var c = TYPES[key], r = compute(key);
+  if (r.count === 0) return toast('Isi rincian berat dulu');
+  if (r.tokens.length !== r.count) return toast('Ada angka berat yang tidak valid (warna merah)');
+  if (r.harga <= 0) return toast('Isi harga per kg dulu');
+  var tx = {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+    type: key,
+    item: c.item ? ($('#'+key+'-item').value.trim() || c.item) : c.label,
+    nama: $('#'+key+'-nama').value.trim() || 'Tanpa nama',
+    tgl: $('#'+key+'-tgl').value || nowLocal(),
+    harga: r.harga, unit: c.unit, weights: r.weights, count: r.count,
+    bruto: r.bruto, tara: r.tara, potPct: r.potPct, potKg: r.potKg, netto: r.netto, total: r.total
+  };
+  hist.push(tx);
+  saveHist();
+  resetPanel(key, true);
+  toast('Transaksi disimpan');
+}
+
+function initPanel(key){
+  var sec = $('#tab-'+key);
+  sec.innerHTML = panelHTML(key);
+  $('#'+key+'-tgl').value = nowLocal();
+  $$('input', sec).forEach(function(inp){
+    inp.addEventListener('input', function(){
+      if (inp.id === key+'-harga'){
+        var d = inp.value.replace(/\D/g,'');
+        inp.value = d ? parseInt(d,10).toLocaleString('id-ID') : '';
+      }
+      renderPanel(key);
+    });
+  });
+  sec.addEventListener('click', function(e){
+    var chip = e.target.closest('.chip');
+    if (chip){
+      var t = readTokens(key); t.splice(+chip.dataset.i, 1);
+      $('#'+key+'-w').value = t.join(' ') + (t.length ? ' ' : '');
+      return renderPanel(key);
+    }
+    var b = e.target.closest('[data-act]');
+    if (!b) return;
+    var w = $('#'+key+'-w');
+    if (b.dataset.act === 'space'){
+      if (w.value && !/\s$/.test(w.value)) w.value += ' ';
+      w.focus(); renderPanel(key);
+    } else if (b.dataset.act === 'undo'){
+      var tk = readTokens(key); tk.pop();
+      w.value = tk.join(' ') + (tk.length ? ' ' : '');
+      w.focus(); renderPanel(key);
+    } else if (b.dataset.act === 'save') savePanel(key);
+    else if (b.dataset.act === 'reset') resetPanel(key, false);
+  });
+  renderPanel(key);
+}
+
+/* =====================================================================
+   PENYIMPANAN (LocalStorage)
+   ===================================================================== */
+var hist = [];
+try { hist = JSON.parse(localStorage.getItem(STORE_KEY) || '[]'); if (!Array.isArray(hist)) hist = []; } catch(e){ hist = []; }
+function saveHist(){
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(hist)); }
+  catch(e){ toast('Gagal menyimpan ke LocalStorage'); }
+}
+
+/* =====================================================================
+   TAB 4 - RIWAYAT, DIAGRAM, EKSPOR
+   ===================================================================== */
+var st = { type:'all', group:'nama', metric:'total', chart:'bar' };
+var chartInst = null;
+
+function filtered(){
+  return hist.filter(function(t){ return st.type === 'all' || t.type === st.type; })
+             .sort(function(a,b){ return a.tgl < b.tgl ? 1 : -1; });
+}
+
+function txText(t){
+  var L = [];
+  L.push('*NOTA TIMBANGAN ' + t.item.toUpperCase() + '*');
+  L.push('Penjual: ' + t.nama);
+  L.push('Tanggal: ' + fmtDate(t.tgl));
+  L.push('Rincian: ' + t.weights.map(function(w){ return fmtNum(w); }).join(' + ') + ' (' + t.count + ' ' + t.unit + ')');
+  L.push('Berat kotor: ' + fmtNum(t.bruto) + ' kg');
+  if (t.tara > 0) L.push('Tara: ' + fmtNum(t.tara) + ' kg');
+  if (t.potPct > 0) L.push('Potongan ' + fmtNum(t.potPct) + '%: ' + fmtNum(t.potKg) + ' kg');
+  L.push('Berat bersih: ' + fmtNum(t.netto) + ' kg');
+  L.push('Harga: ' + fmtRp(t.harga) + '/kg');
+  L.push('*Total: ' + fmtRp(t.total) + '*');
+  return L.join('\n');
+}
+function allText(list){
+  var kg = 0, rp = 0;
+  var L = ['*REKAP TIMBANGAN*', ''];
+  list.forEach(function(t,i){
+    kg += t.netto; rp += t.total;
+    L.push((i+1) + '. ' + t.nama + ' | ' + fmtDate(t.tgl) + ' | ' + t.item + ' | ' + fmtNum(t.netto) + ' kg | ' + fmtRp(t.total));
+  });
+  L.push('');
+  L.push('Total berat bersih: ' + fmtNum(kg) + ' kg');
+  L.push('*Total bayar: ' + fmtRp(rp) + '*');
+  return L.join('\n');
+}
+
+function renderStats(list){
+  var kg = 0, rp = 0;
+  list.forEach(function(t){ kg += t.netto; rp += t.total; });
+  $('#stCount').textContent = list.length;
+  $('#stKg').textContent = fmtNum(kg, 1) + ' kg';
+  $('#stRp').textContent = fmtRp(rp);
+}
+
+function renderList(list){
+  var box = $('#list');
+  if (!list.length){
+    box.innerHTML = '<div class="empty card">Belum ada transaksi. Simpan dari tab Karet atau Jagung, riwayatnya muncul di sini.</div>';
+    return;
+  }
+  box.innerHTML = list.map(function(t){
+    return '<article class="tx">' +
+      '<div class="tx-head"><div><div class="tx-name">'+esc(t.nama)+'</div><div class="tx-date">'+esc(fmtDate(t.tgl))+'</div></div>' +
+      '<span class="badge">'+esc(t.item)+'</span></div>' +
+      '<div class="tx-w">'+t.weights.map(function(w){ return fmtNum(w); }).join(' + ')+' ('+t.count+' '+esc(t.unit)+')</div>' +
+      '<div class="tx-nums"><span>'+fmtNum(t.netto)+' kg × '+fmtRp(t.harga)+'</span><b>'+fmtRp(t.total)+'</b></div>' +
+      '<div class="row"><button class="btn sm primary" data-share="'+t.id+'">Cetak / Ekspor</button>' +
+      '<button class="btn sm danger" data-del="'+t.id+'">Hapus</button></div>' +
+    '</article>';
+  }).join('');
+}
+
+function cssVar(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+function shortRp(n){
+  if (n >= 1e6) return (n/1e6).toFixed(1).replace('.0','') + ' jt';
+  if (n >= 1e3) return Math.round(n/1e3) + ' rb';
+  return String(n);
+}
+
+function renderChart(list){
+  var msg = $('#chartMsg'), cv = $('#chart');
+  if (chartInst){ chartInst.destroy(); chartInst = null; }
+  if (typeof Chart === 'undefined'){
+    cv.style.display = 'none'; msg.hidden = false;
+    msg.textContent = 'Diagram butuh internet untuk memuat Chart.js. Hubungkan internet lalu muat ulang halaman.';
+    return;
+  }
+  if (!list.length){
+    cv.style.display = 'none'; msg.hidden = false;
+    msg.textContent = 'Diagram muncul setelah ada transaksi tersimpan.';
+    return;
+  }
+  cv.style.display = 'block'; msg.hidden = true;
+
+  var map = {}, order = [];
+  list.forEach(function(t){
+    var k = st.group === 'nama' ? t.nama.trim().toLowerCase() : t.tgl.slice(0,10);
+    var label = st.group === 'nama' ? t.nama.trim() : new Date(t.tgl).toLocaleDateString('id-ID',{day:'2-digit',month:'short'});
+    if (!map[k]){ map[k] = { label:label, key:k, val:0 }; order.push(k); }
+    map[k].val += st.metric === 'total' ? t.total : t.netto;
+  });
+  var rows = order.map(function(k){ return map[k]; });
+  if (st.group === 'nama') rows.sort(function(a,b){ return b.val - a.val; });
+  else rows.sort(function(a,b){ return a.key < b.key ? -1 : 1; });
+  rows = st.group === 'nama' ? rows.slice(0,10) : rows.slice(-14);
+
+  var ac = cssVar('--ac'), mut = cssVar('--mut'), grid = cssVar('--grid');
+  var isRp = st.metric === 'total';
+  chartInst = new Chart(cv, {
+    type: st.chart,
+    data: {
+      labels: rows.map(function(r){ return r.label; }),
+      datasets: [{
+        label: isRp ? 'Total Rp' : 'Berat kg',
+        data: rows.map(function(r){ return Math.round(r.val*100)/100; }),
+        backgroundColor: st.chart === 'bar' ? ac : 'transparent',
+        borderColor: ac, borderWidth: 2, borderRadius: 8, tension: .3,
+        pointBackgroundColor: ac, pointRadius: 4, fill: false
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display:false },
+        tooltip: { callbacks: { label: function(c){ return isRp ? fmtRp(c.parsed.y) : fmtNum(c.parsed.y) + ' kg'; } } }
+      },
+      scales: {
+        x: { ticks:{ color:mut, maxRotation:45 }, grid:{ display:false } },
+        y: { beginAtZero:true, ticks:{ color:mut, callback:function(v){ return isRp ? shortRp(v) : v; } }, grid:{ color:grid } }
+      }
+    }
+  });
+}
+
+function renderHistory(){
+  var list = filtered();
+  renderStats(list);
+  renderList(list);
+  renderChart(list);
+}
+
+function setSeg(id, key){
+  $$('#'+id+' .btn').forEach(function(b){
+    b.addEventListener('click', function(){
+      st[key] = b.dataset.v;
+      $$('#'+id+' .btn').forEach(function(x){ x.classList.toggle('on', x === b); });
+      renderHistory();
+    });
+  });
+}
+setSeg('segType','type'); setSeg('segGroup','group'); setSeg('segMetric','metric'); setSeg('segChart','chart');
+
+/* ---------- Modal ringkasan: salin, WhatsApp, cetak ---------- */
+function openModal(text){ $('#modalText').value = text; $('#modal').hidden = false; }
+$('#mClose').addEventListener('click', function(){ $('#modal').hidden = true; });
+$('#modal').addEventListener('click', function(e){ if (e.target.id === 'modal') $('#modal').hidden = true; });
+$('#mCopy').addEventListener('click', function(){
+  var ta = $('#modalText'), text = ta.value;
+  function fallback(){
+    ta.removeAttribute('readonly'); ta.select(); ta.setSelectionRange(0, text.length);
+    var ok = false; try { ok = document.execCommand('copy'); } catch(e){}
+    ta.setAttribute('readonly',''); toast(ok ? 'Teks disalin' : 'Salin manual: blok teksnya');
+  }
+  if (navigator.clipboard && window.isSecureContext){
+    navigator.clipboard.writeText(text).then(function(){ toast('Teks disalin'); }, fallback);
+  } else fallback();
+});
+$('#mWa').addEventListener('click', function(){
+  window.open('https://wa.me/?text=' + encodeURIComponent($('#modalText').value), '_blank');
+});
+$('#mPrint').addEventListener('click', function(){
+  $('#printArea').textContent = $('#modalText').value.replace(/\*/g, '');
+  window.print();
+});
+
+$('#exportAll').addEventListener('click', function(){
+  var list = filtered();
+  if (!list.length) return toast('Belum ada transaksi');
+  openModal(allText(list));
+});
+$('#clearAll').addEventListener('click', function(){
+  if (!hist.length) return toast('Riwayat sudah kosong');
+  if (confirm('Hapus SEMUA riwayat transaksi? Tindakan ini tidak bisa dibatalkan.')){
+    hist = []; saveHist(); renderHistory(); toast('Semua riwayat dihapus');
+  }
+});
+$('#list').addEventListener('click', function(e){
+  var sh = e.target.closest('[data-share]'), de = e.target.closest('[data-del]');
+  if (sh){
+    var t = hist.filter(function(x){ return x.id === sh.dataset.share; })[0];
+    if (t) openModal(txText(t));
+  } else if (de){
+    if (confirm('Hapus transaksi ini?')){
+      hist = hist.filter(function(x){ return x.id !== de.dataset.del; });
+      saveHist(); renderHistory(); toast('Transaksi dihapus');
+    }
+  }
+});
+
+/* ---------- Mulai ---------- */
+Object.keys(TYPES).forEach(initPanel);
+
+})();
+</script>
+</body>
+</html>
