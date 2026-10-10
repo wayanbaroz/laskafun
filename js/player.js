@@ -19,6 +19,8 @@
   let objUrl = null;
   let hist = [];
   let raf = 0;
+  let pendingPlay = false; // apakah lagu yang sedang dimuat harus langsung diputar
+  let retried = null;      // id lagu yang sudah dicoba ulang dari memori
 
   audio.volume = s.volume;
 
@@ -33,6 +35,8 @@
     if (!track) return unload();
     revoke();
     current = track;
+    retried = null;
+    pendingPlay = autoplay !== false;
     audio.src = sourceFor(track);
     audio.load();
     bus.emit('track', track);
@@ -60,7 +64,8 @@
     }
     try { await audio.play(); } catch (e) {
       if (e && e.name === 'NotAllowedError') bus.emit('error', 'Ketuk tombol putar untuk memulai.');
-      else if (e && e.name !== 'AbortError') bus.emit('error', 'Lagu ini tidak bisa diputar di browser ini.');
+      // NotSupportedError ditangani oleh event 'error' audio (pemulihan otomatis + pesan rinci).
+      else if (e && e.name !== 'AbortError' && e.name !== 'NotSupportedError') bus.emit('error', 'Lagu ini tidak bisa diputar di browser ini.');
     }
   }
 
@@ -153,10 +158,42 @@
     }
     bus.emit('tick', audio.currentTime);
   });
-  audio.addEventListener('error', () => {
+  function describeError(code) {
+    const t = current;
+    if (!t) return 'Gagal memuat audio.';
+    if (code === 4) {
+      const type = (t.blob && t.blob.type) || '';
+      const size = t.blob ? (t.blob.size / 1048576).toFixed(1) + ' MB' : 'stream';
+      const can = type ? audio.canPlayType(type) || 'tidak' : '-';
+      return `Format tidak didukung browser ini (${type || 'tipe tak dikenal'}, ${size}, canPlayType: ${can}).`;
+    }
+    if (code === 3) return 'File audio rusak atau tidak bisa didekode.';
+    if (code === 2) return 'Gagal memuat audio (jaringan terputus).';
+    return 'Gagal memuat audio.';
+  }
+
+  audio.addEventListener('error', async () => {
     if (!current) return;
     const code = audio.error ? audio.error.code : 0;
-    bus.emit('error', code === 4 ? 'Format atau sumber audio tidak didukung.' : 'Gagal memuat audio.');
+
+    // Percobaan pemulihan: blob yang ditunjuk bisa file-backed (dari IndexedDB atau pemilih file)
+    // dan sebagian browser HP gagal memutarnya. Baca penuh ke memori, beri MIME dari isi file, coba sekali lagi.
+    if (current.blob && retried !== current.id) {
+      const t = current;
+      retried = t.id;
+      try {
+        const mime = (await NP.mime.sniff(t.blob)) || NP.mime.fromType(t.blob.type) || 'audio/mpeg';
+        const buf = await NP.mime.readBuffer(t.blob);
+        if (current !== t) return;
+        revoke();
+        objUrl = URL.createObjectURL(new Blob([buf], { type: mime }));
+        audio.src = objUrl;
+        audio.load();
+        if (pendingPlay) await play();
+        return;
+      } catch (e) { /* lanjut ke pesan kesalahan */ }
+    }
+    bus.emit('error', describeError(code));
   });
 
   /* Jika lagu yang diputar dihapus, lanjut ke lagu di posisi yang sama */

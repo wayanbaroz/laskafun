@@ -66,8 +66,9 @@
     for (const file of files) {
       // Nama atau tipe file sering kosong/keliru di Android (Drive, WhatsApp, dll.),
       // jadi keputusan akhirnya: apakah browser bisa membacanya sebagai audio.
-      const probe = await probeAudio(file);
-      if (!isAudio(file) && !probe.ok) { skipped.push(file.name || 'tanpa nama'); continue; }
+      const norm = await NP.mime.normalize(file); // MIME dari isi file, blob di memori
+      const probe = await probeAudio(norm.blob);
+      if (!isAudio(file) && !norm.sniffed && !probe.ok) { skipped.push(file.name || 'tanpa nama'); continue; }
       if (!probe.ok) unplayable++;
       const tags = await NP.id3.read(file);
       const guess = parseFileName(file.name);
@@ -77,7 +78,7 @@
         artist: (tags && tags.artist) || guess.artist,
         album: (tags && tags.album) || '',
         duration: probe.duration,
-        blob: file,
+        blob: norm.blob,
         url: null,
         cover: (tags && tags.cover) || null,
         lyrics: null,
@@ -91,7 +92,8 @@
   }
 
   /** Audio hasil unduhan (Blob) */
-  function addBlob(blob, meta) {
+  async function addBlob(raw, meta) {
+    const blob = (await NP.mime.normalize(raw)).blob;
     return addTrack({
       id: uid(), title: meta.title || 'Tanpa judul', artist: meta.artist || '', album: meta.album || '',
       duration: meta.duration || 0, blob, url: null, cover: meta.cover || null, lyrics: null, added: Date.now(),

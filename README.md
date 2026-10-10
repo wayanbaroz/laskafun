@@ -18,6 +18,7 @@ css/app.css         layout dan komponen (cakram, dial, slider, sheet, editor)
 js/util.js          helper DOM, format waktu, event bus
 js/store.js         IndexedDB (lagu) + localStorage (preferensi)
 js/lrc.js           parser dan penulis .lrc
+js/mime.js          deteksi format audio dari isi file (anti "format tidak didukung")
 js/id3.js           pembaca tag ID3 (judul, artis, sampul)
 js/ui.js            toast, sheet/drawer, konfirmasi dua ketukan
 js/player.js        mesin audio, antrean, acak, ulangi, media session

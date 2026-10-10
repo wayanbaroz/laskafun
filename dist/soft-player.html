@@ -1059,6 +1059,80 @@ ul, ol { list-style: none; }
 
 </script>
 <script>
+/* mime.js  Deteksi jenis audio dari ISI file (magic bytes), bukan dari nama atau tipe yang dilaporkan HP.
+   Safari dan WebView menolak blob audio bila MIME kosong atau keliru ("format tidak didukung"),
+   padahal filenya sendiri sehat. Blob yang dibuat di sini selalu punya MIME yang benar. */
+(function () {
+  'use strict';
+  const NP = window.NP;
+
+  const EXT = {
+    mp3: 'audio/mpeg', m4a: 'audio/mp4', mp4: 'audio/mp4', aac: 'audio/aac', wav: 'audio/wav',
+    ogg: 'audio/ogg', oga: 'audio/ogg', opus: 'audio/ogg', flac: 'audio/flac',
+    weba: 'audio/webm', webm: 'audio/webm', aif: 'audio/aiff', aiff: 'audio/aiff',
+  };
+  const ALIAS = {
+    'audio/mp3': 'audio/mpeg', 'audio/x-mpeg': 'audio/mpeg', 'audio/mpeg3': 'audio/mpeg', 'audio/x-mp3': 'audio/mpeg',
+    'audio/x-m4a': 'audio/mp4', 'audio/m4a': 'audio/mp4', 'audio/x-wav': 'audio/wav', 'audio/wave': 'audio/wav',
+    'audio/vnd.wave': 'audio/wav', 'audio/x-flac': 'audio/flac', 'audio/x-aac': 'audio/aac',
+  };
+  const MAX_MEMORY = 150 * 1024 * 1024; // di atas ini tetap file-backed agar memori aman
+
+  function readBuffer(blob) {
+    if (blob.arrayBuffer) return blob.arrayBuffer();
+    return new Promise((resolve, reject) => {
+      const fr = new FileReader();
+      fr.onload = () => resolve(fr.result);
+      fr.onerror = () => reject(fr.error);
+      fr.readAsArrayBuffer(blob);
+    });
+  }
+
+  /** Jenis audio dari byte awal file, atau '' bila tidak dikenali. */
+  async function sniff(blob) {
+    try {
+      const b = new Uint8Array(await readBuffer(blob.slice(0, 16)));
+      const s = (o, n) => String.fromCharCode.apply(null, Array.from(b.slice(o, o + n)));
+      if (s(0, 3) === 'ID3') return 'audio/mpeg';
+      if (s(0, 4) === 'RIFF' && s(8, 4) === 'WAVE') return 'audio/wav';
+      if (s(4, 4) === 'ftyp') return 'audio/mp4';
+      if (s(0, 4) === 'OggS') return 'audio/ogg';
+      if (s(0, 4) === 'fLaC') return 'audio/flac';
+      if (s(0, 4) === 'FORM' && s(8, 4) === 'AIFF') return 'audio/aiff';
+      if (b[0] === 0xff && (b[1] & 0xe0) === 0xe0) return ((b[1] >> 1) & 3) === 0 ? 'audio/aac' : 'audio/mpeg';
+    } catch (e) { /* abaikan */ }
+    return '';
+  }
+
+  const fromName = (name) => {
+    const m = /\.([a-z0-9]+)$/i.exec(name || '');
+    return m ? EXT[m[1].toLowerCase()] || '' : '';
+  };
+  const fromType = (t) => {
+    t = String(t || '').toLowerCase().split(';')[0].trim();
+    if (ALIAS[t]) return ALIAS[t];
+    return t.startsWith('audio/') ? t : '';
+  };
+
+  /** File -> {blob, mime, sniffed}. blob berada di memori dan ber-MIME benar. */
+  async function normalize(file) {
+    const sniffed = await sniff(file);
+    const mime = sniffed || fromType(file.type) || fromName(file.name) || '';
+    let blob = file;
+    try {
+      if (mime && file.size <= MAX_MEMORY) blob = new Blob([await readBuffer(file)], { type: mime });
+      else if (mime) blob = file.slice(0, file.size, mime);
+    } catch (e) {
+      if (mime) blob = file.slice(0, file.size, mime);
+    }
+    return { blob, mime, sniffed: !!sniffed };
+  }
+
+  NP.mime = { sniff, normalize, readBuffer, fromName, fromType };
+})();
+
+</script>
+<script>
 /* id3.js  Pembaca tag ID3v2.3/2.4 minimal: judul, artis, album, sampul. */
 (function () {
   'use strict';
@@ -1274,6 +1348,8 @@ ul, ol { list-style: none; }
   let objUrl = null;
   let hist = [];
   let raf = 0;
+  let pendingPlay = false; // apakah lagu yang sedang dimuat harus langsung diputar
+  let retried = null;      // id lagu yang sudah dicoba ulang dari memori
 
   audio.volume = s.volume;
 
@@ -1288,6 +1364,8 @@ ul, ol { list-style: none; }
     if (!track) return unload();
     revoke();
     current = track;
+    retried = null;
+    pendingPlay = autoplay !== false;
     audio.src = sourceFor(track);
     audio.load();
     bus.emit('track', track);
@@ -1315,7 +1393,8 @@ ul, ol { list-style: none; }
     }
     try { await audio.play(); } catch (e) {
       if (e && e.name === 'NotAllowedError') bus.emit('error', 'Ketuk tombol putar untuk memulai.');
-      else if (e && e.name !== 'AbortError') bus.emit('error', 'Lagu ini tidak bisa diputar di browser ini.');
+      // NotSupportedError ditangani oleh event 'error' audio (pemulihan otomatis + pesan rinci).
+      else if (e && e.name !== 'AbortError' && e.name !== 'NotSupportedError') bus.emit('error', 'Lagu ini tidak bisa diputar di browser ini.');
     }
   }
 
@@ -1408,10 +1487,42 @@ ul, ol { list-style: none; }
     }
     bus.emit('tick', audio.currentTime);
   });
-  audio.addEventListener('error', () => {
+  function describeError(code) {
+    const t = current;
+    if (!t) return 'Gagal memuat audio.';
+    if (code === 4) {
+      const type = (t.blob && t.blob.type) || '';
+      const size = t.blob ? (t.blob.size / 1048576).toFixed(1) + ' MB' : 'stream';
+      const can = type ? audio.canPlayType(type) || 'tidak' : '-';
+      return `Format tidak didukung browser ini (${type || 'tipe tak dikenal'}, ${size}, canPlayType: ${can}).`;
+    }
+    if (code === 3) return 'File audio rusak atau tidak bisa didekode.';
+    if (code === 2) return 'Gagal memuat audio (jaringan terputus).';
+    return 'Gagal memuat audio.';
+  }
+
+  audio.addEventListener('error', async () => {
     if (!current) return;
     const code = audio.error ? audio.error.code : 0;
-    bus.emit('error', code === 4 ? 'Format atau sumber audio tidak didukung.' : 'Gagal memuat audio.');
+
+    // Percobaan pemulihan: blob yang ditunjuk bisa file-backed (dari IndexedDB atau pemilih file)
+    // dan sebagian browser HP gagal memutarnya. Baca penuh ke memori, beri MIME dari isi file, coba sekali lagi.
+    if (current.blob && retried !== current.id) {
+      const t = current;
+      retried = t.id;
+      try {
+        const mime = (await NP.mime.sniff(t.blob)) || NP.mime.fromType(t.blob.type) || 'audio/mpeg';
+        const buf = await NP.mime.readBuffer(t.blob);
+        if (current !== t) return;
+        revoke();
+        objUrl = URL.createObjectURL(new Blob([buf], { type: mime }));
+        audio.src = objUrl;
+        audio.load();
+        if (pendingPlay) await play();
+        return;
+      } catch (e) { /* lanjut ke pesan kesalahan */ }
+    }
+    bus.emit('error', describeError(code));
   });
 
   /* Jika lagu yang diputar dihapus, lanjut ke lagu di posisi yang sama */
@@ -1525,8 +1636,9 @@ ul, ol { list-style: none; }
     for (const file of files) {
       // Nama atau tipe file sering kosong/keliru di Android (Drive, WhatsApp, dll.),
       // jadi keputusan akhirnya: apakah browser bisa membacanya sebagai audio.
-      const probe = await probeAudio(file);
-      if (!isAudio(file) && !probe.ok) { skipped.push(file.name || 'tanpa nama'); continue; }
+      const norm = await NP.mime.normalize(file); // MIME dari isi file, blob di memori
+      const probe = await probeAudio(norm.blob);
+      if (!isAudio(file) && !norm.sniffed && !probe.ok) { skipped.push(file.name || 'tanpa nama'); continue; }
       if (!probe.ok) unplayable++;
       const tags = await NP.id3.read(file);
       const guess = parseFileName(file.name);
@@ -1536,7 +1648,7 @@ ul, ol { list-style: none; }
         artist: (tags && tags.artist) || guess.artist,
         album: (tags && tags.album) || '',
         duration: probe.duration,
-        blob: file,
+        blob: norm.blob,
         url: null,
         cover: (tags && tags.cover) || null,
         lyrics: null,
@@ -1550,7 +1662,8 @@ ul, ol { list-style: none; }
   }
 
   /** Audio hasil unduhan (Blob) */
-  function addBlob(blob, meta) {
+  async function addBlob(raw, meta) {
+    const blob = (await NP.mime.normalize(raw)).blob;
     return addTrack({
       id: uid(), title: meta.title || 'Tanpa judul', artist: meta.artist || '', album: meta.album || '',
       duration: meta.duration || 0, blob, url: null, cover: meta.cover || null, lyrics: null, added: Date.now(),
