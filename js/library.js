@@ -27,16 +27,23 @@
     }
   }
 
-  function probeDuration(blob) {
+  /** Coba muat metadata. ok=true bila browser bisa membaca file sebagai audio. */
+  function probeAudio(blob) {
     return new Promise((resolve) => {
       const url = URL.createObjectURL(blob);
       const a = new Audio();
       let done = false;
-      const finish = (d) => { if (done) return; done = true; URL.revokeObjectURL(url); resolve(isFinite(d) ? d : 0); };
+      const finish = (ok) => {
+        if (done) return;
+        done = true;
+        const d = a.duration;
+        URL.revokeObjectURL(url);
+        resolve({ ok, duration: ok && isFinite(d) ? d : 0 });
+      };
       a.preload = 'metadata';
-      a.onloadedmetadata = () => finish(a.duration);
-      a.onerror = () => finish(0);
-      setTimeout(() => finish(a.duration), 5000);
+      a.onloadedmetadata = () => finish(true);
+      a.onerror = () => finish(false);
+      setTimeout(() => finish(false), 6000);
       a.src = url;
     });
   }
@@ -54,9 +61,14 @@
   /** File audio dari perangkat */
   async function addFiles(files) {
     const added = [];
-    let skipped = 0;
+    const skipped = [];
+    let unplayable = 0;
     for (const file of files) {
-      if (!isAudio(file)) { skipped++; continue; }
+      // Nama atau tipe file sering kosong/keliru di Android (Drive, WhatsApp, dll.),
+      // jadi keputusan akhirnya: apakah browser bisa membacanya sebagai audio.
+      const probe = await probeAudio(file);
+      if (!isAudio(file) && !probe.ok) { skipped.push(file.name || 'tanpa nama'); continue; }
+      if (!probe.ok) unplayable++;
       const tags = await NP.id3.read(file);
       const guess = parseFileName(file.name);
       const t = {
@@ -64,7 +76,7 @@
         title: (tags && tags.title) || guess.title,
         artist: (tags && tags.artist) || guess.artist,
         album: (tags && tags.album) || '',
-        duration: await probeDuration(file),
+        duration: probe.duration,
         blob: file,
         url: null,
         cover: (tags && tags.cover) || null,
@@ -73,7 +85,8 @@
       };
       added.push(await addTrack(t));
     }
-    if (skipped) NP.ui.toast(`${skipped} file dilewati karena bukan audio.`, 'warn');
+    if (skipped.length) NP.ui.toast(`Dilewati (bukan audio): ${skipped.slice(0, 2).join(', ')}${skipped.length > 2 ? ` +${skipped.length - 2}` : ''}`, 'warn');
+    if (unplayable) NP.ui.toast('Browser ini mungkin tidak bisa memutar format file tersebut.', 'warn');
     return added;
   }
 

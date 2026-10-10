@@ -77,6 +77,7 @@
       el.queue.textContent = i >= 0 ? `Lagu ${i + 1} dari ${list.length}` : `${list.length} lagu di pustaka`;
     }
     $('#libCount').textContent = String(list.length);
+    $('#btnEmptyImport').hidden = list.length > 0;
   }
 
   function updateModes(m) {
@@ -103,13 +104,19 @@
   }
 
   /* ---------- Input berkas ---------- */
-  async function onSongs(files) {
+  async function onSongs(files, input) {
     if (!files.length) return;
-    toast('Mengimpor…');
-    const added = await library.addFiles(files);
-    if (!added.length) return;
-    toast(added.length === 1 ? 'Lagu ditambahkan.' : `${added.length} lagu ditambahkan.`);
-    if (!player.track() || !player.isPlaying()) await player.load(added[0], true);
+    try {
+      toast(files.length === 1 ? 'Mengimpor 1 file…' : `Mengimpor ${files.length} file…`);
+      const added = await library.addFiles(files);
+      if (!added.length) return;
+      toast(added.length === 1 ? 'Lagu ditambahkan.' : `${added.length} lagu ditambahkan.`);
+      if (!player.track() || !player.isPlaying()) await player.load(added[0], true);
+    } catch (e) {
+      toast('Gagal mengimpor: ' + ((e && e.message) || e), 'warn');
+    } finally {
+      if (input) input.value = ''; // dikosongkan setelah selesai agar file yang sama bisa dipilih lagi
+    }
   }
 
   async function onLyrics(file) {
@@ -129,12 +136,10 @@
   function bind() {
     $('#btnMenu').addEventListener('click', () => ui.open('drawer'));
     $('#btnSearch').addEventListener('click', actions.openSearch);
-    $$('.menu-item').forEach((b) => b.addEventListener('click', () => {
-      const name = b.dataset.action;
-      if (name === 'importSongs' || name === 'importLyrics') { ui.close(); actions[name](); }
-      else actions[name]();
-    }));
+    // Menu tidak ditutup sebelum picker terbuka: input.click() harus langsung di dalam ketukan pengguna.
+    $$('.menu-item').forEach((b) => b.addEventListener('click', () => actions[b.dataset.action]()));
     $('#btnLibAdd').addEventListener('click', actions.importSongs);
+    $('#btnEmptyImport').addEventListener('click', actions.importSongs);
     $$('.seg-btn').forEach((b) => b.addEventListener('click', () => actions.showMode(b.dataset.mode)));
 
     $('#btnPlay').addEventListener('click', () => player.toggle());
@@ -144,8 +149,18 @@
     $('#btnRepeat').addEventListener('click', () => player.cycleRepeat());
     $('#disk').addEventListener('click', () => player.toggle());
 
-    $('#fileSongs').addEventListener('change', (e) => { const f = Array.from(e.target.files); e.target.value = ''; onSongs(f); });
-    $('#fileLyrics').addEventListener('change', (e) => { const f = e.target.files[0]; e.target.value = ''; onLyrics(f); });
+    $('#fileSongs').addEventListener('change', (e) => {
+      const input = e.target;
+      const files = Array.from(input.files || []);
+      if (ui.current() === 'drawer') ui.close();
+      onSongs(files, input);
+    });
+    $('#fileLyrics').addEventListener('change', async (e) => {
+      const input = e.target;
+      const file = input.files && input.files[0];
+      if (ui.current() === 'drawer') ui.close();
+      try { await onLyrics(file); } finally { input.value = ''; }
+    });
 
     document.addEventListener('keydown', (e) => {
       if (ui.current()) return;
@@ -190,6 +205,11 @@
     if (!NP.store.isPersistent()) toast('Penyimpanan permanen tidak tersedia. Lagu hanya tersimpan selama sesi ini.', 'warn');
   }
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
-  else boot();
+  // Tampilkan kesalahan tak terduga sebagai toast supaya mudah dilaporkan.
+  window.addEventListener('error', (e) => toast('Kesalahan: ' + (e.message || 'tidak diketahui'), 'warn'));
+  window.addEventListener('unhandledrejection', (e) => toast('Kesalahan: ' + ((e.reason && e.reason.message) || e.reason || 'tidak diketahui'), 'warn'));
+
+  const start = () => boot().catch((e) => toast('Gagal memulai: ' + ((e && e.message) || e), 'warn'));
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
 })();

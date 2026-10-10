@@ -13,9 +13,13 @@
 
   function open() {
     return new Promise((resolve) => {
-      if (!window.indexedDB) return resolve(null);
       let req;
-      try { req = indexedDB.open(DB_NAME, 1); } catch (e) { return resolve(null); }
+      try {
+        // Di iframe ber-sandbox, mengakses window.indexedDB bisa melempar SecurityError.
+        if (!window.indexedDB) return resolve(null);
+        req = indexedDB.open(DB_NAME, 1);
+      } catch (e) { return resolve(null); }
+      setTimeout(() => resolve(null), 4000); // jangan menggantung bila browser tidak menjawab
       req.onupgradeneeded = () => {
         if (!req.result.objectStoreNames.contains(STORE)) req.result.createObjectStore(STORE, { keyPath: 'id' });
       };

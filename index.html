@@ -100,6 +100,7 @@
         <h1 id="nowTitle">Belum ada lagu</h1>
         <p id="nowArtist">Impor lagu lewat menu</p>
       </div>
+      <button class="btn-pill" id="btnEmptyImport" type="button"><svg class="ico tint-warm" aria-hidden="true"><use href="#i-upload"/></svg>Impor lagu dari perangkat</button>
       <p class="peek" id="peekLine">Lirik akan tampil di sini</p>
     </section>
 
@@ -293,8 +294,9 @@
 
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
-<input type="file" id="fileSongs" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.opus,.flac" multiple hidden>
-<input type="file" id="fileLyrics" accept=".lrc,.txt,text/plain,application/octet-stream" hidden>
+<!-- Tanpa atribut accept dan tanpa display:none: paling kompatibel di Android/iOS. Jenis file disaring di kode. -->
+<input type="file" id="fileSongs" class="file-input" multiple tabindex="-1" aria-hidden="true">
+<input type="file" id="fileLyrics" class="file-input" tabindex="-1" aria-hidden="true">
 
 <script src="js/util.js"></script>
 <script src="js/store.js"></script>
